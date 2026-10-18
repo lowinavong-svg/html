@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>線型大偵探｜線段、直線、射線、曲線 教學小遊戲</title>
+<style>
+*{box-sizing:border-box;font-family:Microsoft YaHei;margin:0;padding:0;}
+body{background:#f3faff;padding:20px;}
+.wrap{max-width:900px;margin:0 auto;background:#fff;border-radius:16px;padding:30px;box-shadow:0 2px 10px #0002;}
+h1{text-align:center;color:#224;font-size:34px;margin-bottom:20px;}
+.stage{text-align:center;margin:20px 0;font-size:26px;font-weight:bold;}
+#canvasBox{text-align:center;margin:20px 0;}
+canvas{border:1px solid #aaa;background:#fff;border-radius:8px;}
+.scoreBox{font-size:24px;text-align:center;margin-bottom:15px;color:#c22;}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:25px 0;}
+.optBtn{padding:14px 22px;font-size:22px;border:none;border-radius:10px;background:#46f;color:#fff;cursor:pointer;}
+.optBtn:hover{background:#24c;}
+.optBtn:disabled{background:#aaa;cursor:not-allowed;}
+.judgeBtn{padding:14px 30px;font-size:22px;border:none;border-radius:10px;margin:0 8px;cursor:pointer;}
+.judgeBtn:disabled{background:#aaa;cursor:not-allowed;}
+#btnTrue{background:#3b6; color:white;}
+#btnFalse{background:#e44;color:white;}
+.msg{text-align:center;font-size:26px;font-weight:bold;height:40px;margin:10px 0;}
+.right{color:#090;}
+.wrong{color:#d22;}
+.info{background:#eef;padding:16px;border-radius:10px;margin-top:20px;font-size:18px;display:none;}
+.ctrl{text-align:center;margin-top:20px;}
+#restart{padding:12px 24px;font-size:20px;background:#888;color:white;border:none;border-radius:8px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎯 線型大偵探</h1>
+<div class="scoreBox">得分：<span id="score">0</span></div>
+<div class="stage" id="stageText">第一關：看圖，選出這是哪一種線</div>
+<div id="canvasBox">
+<canvas id="cvs" width="700" height="140"></canvas>
+</div>
+<div class="msg" id="msgBox"></div>
+<div class="btns" id="selectGroup">
+<button class="optBtn" onclick="checkPic('segment')">線段</button>
+<button class="optBtn" onclick="checkPic('ray')">射線</button>
+<button class="optBtn" onclick="checkPic('line')">直線</button>
+<button class="optBtn" onclick="checkPic('curve')">曲線</button>
+</div>
+<div id="judgeGroup" style="display:none;text-align:center;">
+<button class="judgeBtn" id="btnTrue" onclick="checkJudge(true)">對</button>
+<button class="judgeBtn" id="btnFalse" onclick="checkJudge(false)">錯</button>
+</div>
+<div class="info" id="infoPanel">
+<b>知識小卡</b><br>
+🔵線段：2個端點，直，可以測量長度<br>
+🟠射線：1個端點，向一邊無限延伸，不可測<br>
+🟢直線：0個端點，兩邊無限延伸，不可測<br>
+🩷曲線：彎彎的線，沒有固定端點規則
+</div>
+<div class="ctrl">
+<button onclick="showInfo()">顯示/隱藏知識卡</button>
+<button id="restart" onclick="restartGame()">重新開始</button>
+</div>
+</div>
+
+<script>
+// 遊戲資料
+let score = 0;
+let level = 1; //1圖形辨認，2看圖判斷是非
+// 第一關 共4題
+let picList = [
+    {type:"segment",name:"線段",drawType:"h"},
+    {type:"ray",name:"射線",drawType:"h"},
+    {type:"line",name:"直線",drawType:"h"},
+    {type:"curve",name:"曲線",drawType:"bezier1"},
+];
+// 第二關 共6題
+let judgeList = [
+    {q:"這條圖形有2個端點，可以量長度",ans:true,type:"segment",drawType:"s1"},
+    {q:"這條圖形有2個端點",ans:false,type:"ray",drawType:"h"},
+    {q:"這條是直線，有0個端點",ans:true,type:"line",drawType:"s1"},
+    {q:"這條是射線，兩端都可以無限延長",ans:false,type:"ray",drawType:"v"},
+    {q:"這是曲線，不是直的線",ans:true,type:"curve",drawType:"bezier1"},
+    {q:"射線可以量出長度",ans:false,type:"ray",drawType:"s2"},
+];
+
+let picUsed=[];
+let judgeUsed=[];
+let picIdx=0,judgeIdx=0;
+let isAnswering = false;
+const cvs = document.getElementById("cvs");
+const ctx = cvs.getContext("2d");
+
+//繪圖【無箭頭】
+function drawLine(item){
+    const type = item.type;
+    const drawType = item.drawType;
+    ctx.clearRect(0,0,700,140);
+    ctx.lineWidth=4;
+    ctx.fillStyle="red";
+
+    if(type==="segment"){
+        ctx.strokeStyle="#348";
+        if(drawType==="h"){
+            ctx.beginPath();ctx.moveTo(100,70);ctx.lineTo(600,70);ctx.stroke();
+            ctx.beginPath();ctx.arc(100,70,7,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(600,70,7,0,Math.PI*2);ctx.fill();
+        }else if(drawType==="v"){
+            ctx.beginPath();ctx.moveTo(350,20);ctx.lineTo(350,120);ctx.stroke();
+            ctx.beginPath();ctx.arc(350,20,7,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(350,120,7,0,Math.PI*2);ctx.fill();
+        }else if(drawType==="s1"){
+            ctx.beginPath();ctx.moveTo(120,30);ctx.lineTo(580,110);ctx.stroke();
+            ctx.beginPath();ctx.arc(120,30,7,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.arc(580,110,7,0,Math.PI*2);ctx.fill();
+        }
+    }else if(type==="ray"){
+        ctx.strokeStyle="#f80";
+        if(drawType==="h"){
+            ctx.beginPath();ctx.moveTo(100,70);ctx.lineTo(680,70);ctx.stroke();
+            ctx.beginPath();ctx.arc(100,70,7,0,Math.PI*2);ctx.fill();
+        }else if(drawType==="v"){
+            ctx.beginPath();ctx.moveTo(350,20);ctx.lineTo(350,120);ctx.stroke();
+            ctx.beginPath();ctx.arc(350,20,7,0,Math.PI*2);ctx.fill();
+        }else if(drawType==="s2"){
+            ctx.beginPath();ctx.moveTo(100,110);ctx.lineTo(620,30);ctx.stroke();
+            ctx.beginPath();ctx.arc(100,110,7,0,Math.PI*2);ctx.fill();
+        }
+    }else if(type==="line"){
+        ctx.strokeStyle="#2a9d2a";
+        if(drawType==="h"){
+            ctx.beginPath();ctx.moveTo(20,70);ctx.lineTo(680,70);ctx.stroke();
+        }else if(drawType==="s1"){
+            ctx.beginPath();ctx.moveTo(20,110);ctx.lineTo(680,30);ctx.stroke();
+        }
+    }else if(type==="curve"){
+        ctx.strokeStyle="#e84393";
+        ctx.beginPath();
+        ctx.moveTo(50,70);
+        ctx.bezierCurveTo(200,20,460,110,650,70);
+        ctx.stroke();
+    }
+}
+
+// 第一關：看圖選答案（共4題）
+function nextPic(){
+    isAnswering=false;
+    document.querySelectorAll("#selectGroup .optBtn").forEach(b=>b.disabled=false);
+    let pool = picList.filter((_,i)=>!picUsed.includes(i));
+    let rnd = Math.floor(Math.random()*pool.length);
+    let item = pool[rnd];
+    picIdx = picList.indexOf(item);
+    picUsed.push(picIdx);
+    drawLine(item);
+    document.getElementById("msgBox").innerText="";
+}
+
+function checkPic(selectType){
+    if(isAnswering) return;
+    isAnswering=true;
+    document.querySelectorAll("#selectGroup .optBtn").forEach(b=>b.disabled=true);
+    const correct = picList[picIdx].type;
+    const msgBox = document.getElementById("msgBox");
+    if(selectType===correct){
+        score++;
+        msgBox.className="msg right";
+        msgBox.innerText="✅答對！這是"+picList[picIdx].name;
+    }else{
+        msgBox.className="msg wrong";
+        msgBox.innerText="❌錯了，正確是："+picList[picIdx].name;
+    }
+    document.getElementById("score").innerText=score;
+
+    // 4題完成，切換第二關
+    if(picUsed.length >=4){
+        setTimeout(()=>{
+            switchLevel2();
+        },1800);
+    }else{
+        setTimeout(nextPic,1800);
+    }
+}
+
+//第二關：看圖+閱讀題目，判斷對錯（共6題，圖形跟題目綁在一起）
+function nextJudge(){
+    isAnswering=false;
+    document.querySelectorAll("#judgeGroup .judgeBtn").forEach(b=>b.disabled=false);
+    let pool = judgeList.filter((_,i)=>!judgeUsed.includes(i));
+    let rnd = Math.floor(Math.random()*pool.length);
+    let item = pool[rnd];
+    judgeIdx = judgeList.indexOf(item);
+    judgeUsed.push(judgeIdx);
+    drawLine(item); //第二關一併繪製本題對應圖形！
+    // 固定開頭【第二關】
+    document.getElementById("stageText").innerText = "第二關："+ item.q;
+    document.getElementById("msgBox").innerText="";
+}
+
+function checkJudge(selBool){
+    if(isAnswering) return;
+    isAnswering=true;
+    document.querySelectorAll("#judgeGroup .judgeBtn").forEach(b=>b.disabled=true);
+    const msgBox = document.getElementById("msgBox");
+    const corAns = judgeList[judgeIdx].ans;
+    if(selBool === corAns){
+        score++;
+        msgBox.className="msg right";
+        msgBox.innerText="✅正確！";
+    }else{
+        msgBox.className="msg wrong";
+        msgBox.innerText="❌答錯囉";
+    }
+    document.getElementById("score").innerText=score;
+
+    //第二關6題做完，遊戲結束
+    if(judgeUsed.length >= judgeList.length){
+        setTimeout(()=>{
+            endGame();
+        },1800);
+    }else{
+        setTimeout(nextJudge,1800);
+    }
+}
+
+function switchLevel2(){
+    level=2;
+    document.getElementById("stageText").innerText="第二關：看圖，判斷句子對或錯";
+    document.getElementById("selectGroup").style.display="none";
+    document.getElementById("judgeGroup").style.display="block";
+    nextJudge();
+}
+
+function endGame(){
+    document.getElementById("stageText").innerText="🎉全部題目完成！";
+    document.getElementById("msgBox").className="msg right";
+    document.getElementById("msgBox").innerText="總得分："+score+"分（共10題）";
+    document.getElementById("judgeGroup").style.display="none";
+}
+
+function showInfo(){
+    const p = document.getElementById("infoPanel");
+    p.style.display = p.style.display==="block"?"none":"block";
+}
+
+function restartGame(){
+    score=0;level=1;
+    picUsed=[];judgeUsed=[];
+    isAnswering=false;
+    document.getElementById("score").innerText=score;
+    document.getElementById("stageText").innerText="第一關：看圖，選出這是哪一種線";
+    document.getElementById("msgBox").innerText="";
+    document.getElementById("selectGroup").style.display="flex";
+    document.getElementById("judgeGroup").style.display="none";
+    nextPic();
+}
+
+restartGame();
+</script>
+</body>
+</html>
